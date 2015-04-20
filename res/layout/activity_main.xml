@@ -8,9 +8,28 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context="com.zhou.densityinspection.MainActivity" >
 
-    <TextView
-        android:layout_width="wrap_content"
+    <RelativeLayout 
+        android:id="@+id/bt_bottombar"
+        android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:text="@string/hello_world" />
-
+        android:layout_alignParentBottom="true">
+        <Button 
+            android:id="@+id/btn_startservice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="启动服务端"/>
+        <Button 
+            android:id="@+id/btn_startsearch"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/btn_startservice"
+            android:text="开始搜索"/>
+    </RelativeLayout>
+    
+    <ListView 
+        android:id="@+id/list"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_above="@id/bt_bottombar"></ListView>
+    
 </RelativeLayout>
