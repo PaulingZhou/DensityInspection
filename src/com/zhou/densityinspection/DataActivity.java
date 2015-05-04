@@ -23,7 +23,7 @@ public class DataActivity extends Activity {
 
 	private BluetoothSocket socket = null;
 	private BluetoothDevice device = null;
-	private TextView tvData = null;
+	private TextView tvDataTemp,tvDataHumi = null;
 	private BluetoothAdapter mBluetoothAdapter = BluetoothAdapter
 			.getDefaultAdapter();
 	
@@ -55,7 +55,8 @@ public class DataActivity extends Activity {
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.data);
-		tvData = (TextView) findViewById(R.id.tv_data);
+		tvDataTemp = (TextView) findViewById(R.id.tv_data_temp);
+		tvDataHumi = (TextView) findViewById(R.id.tv_data_humi);
 	}
 
 	@Override
@@ -76,12 +77,14 @@ public class DataActivity extends Activity {
 			try {
 				socket = device.createRfcommSocketToServiceRecord(UUID
 						.fromString("00001101-0000-1000-8000-00805F9B34FB"));
-				Message msg = new Message();
-				msg.obj = "请稍候，正在连接服务器" + BlueTooth.BlueToothAddress;
-				LinkDetectedHandler.sendMessage(msg);
+//				Toast.makeText(DataActivity.this, "请稍候，正在连接服务器" + BlueTooth.BlueToothAddress, Toast.LENGTH_SHORT).show();
+//				Message msg = new Message();
+//				msg.obj = "请稍候，正在连接服务器" + BlueTooth.BlueToothAddress;
+//				LinkDetectedHandler.sendMessage(msg);
 				socket.connect();
-				msg.obj = "已经连接上服务器：" + BlueTooth.BlueToothAddress;
-				LinkDetectedHandler.sendMessage(msg);
+//				Toast.makeText(DataActivity.this, "已经连接上服务器：" + BlueTooth.BlueToothAddress, Toast.LENGTH_SHORT).show();
+//				msg.obj = "已经连接上服务器：" + BlueTooth.BlueToothAddress;
+//				LinkDetectedHandler.sendMessage(msg);
 				mreadThread = new readThread();
 				mreadThread.start();
 			} catch (IOException e) {
@@ -115,31 +118,15 @@ public class DataActivity extends Activity {
 							}
 							if(count == 2&&(!ishead)){
 								buffer[i] = data;
-//								Log.e("buffer"+i, ""+data);
 								i++;
-							}if(i==5){
+							}if(i==4){
 								i=0;
 								count=0;
 								Message msg = new Message();
 								msg.obj = "";
-								for(int a=0;a<5;a++){
-									msg.obj = msg.obj + ""+buffer[a]; 
-								}
+								msg.obj = buffer;
 								LinkDetectedHandler.sendMessage(msg);
 							}
-//						}
-						// Read from the InputStream
-//						    bytes = mmInStream.read(buffer);
-//							Log.e("bytes", ""+bytes);
-//							for (int i = 0; i < bytes; i++) {
-//								buf_data[i] = buffer[i];
-//								Log.e("buf_data"+i, ""+buffer[i]);
-//							}
-//							String s = new String(buf_data);
-//							Message msg = new Message();
-//							msg.obj = s;
-//							msg.what = 1;
-//							LinkDetectedHandler.sendMessage(msg);
 					}
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -150,8 +137,17 @@ public class DataActivity extends Activity {
 	private Handler LinkDetectedHandler = new Handler(){
 		@Override
 		public void handleMessage(Message msg) {
-			Log.e("msg", (String) msg.obj);
-			tvData.setText((String) msg.obj);
+			byte[] buffer = (byte[])msg.obj;
+			int temp_i = (int)(buffer[1]&0xFF)*256+(int)(buffer[0]&0xFF);
+			int humi_i = (int)(buffer[3]&0xFF)*256+(int)(buffer[2]&0xFF);
+			float temp_f = (float) (((float)temp_i)*0.01-40);
+			float humi_f = (float)(((float)humi_i)*0.0405-((float)humi_i*(float)humi_i)*2.8/1000000-4);
+			Log.e("temp_i", ""+temp_i);
+			Log.e("humi_i", ""+humi_i);
+			Log.e("temp_f", ""+temp_f);
+			Log.e("humi_f", ""+humi_f);
+			tvDataTemp.setText("温度为："+temp_f+"℃");
+			tvDataHumi.setText("湿度为："+humi_f+"%");
 		}
 	};
 	
