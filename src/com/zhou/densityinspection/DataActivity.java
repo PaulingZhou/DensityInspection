@@ -1,9 +1,7 @@
 package com.zhou.densityinspection;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.UUID;
 
 import com.zhou.densityinspection.BlueTooth.ServerOrClient;
@@ -20,13 +18,16 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class DataActivity extends Activity {
+	public enum Status {
+		OUTFRAME, HEADFRAME1, HEADFRAME2, LENGTHFRAME, DATAFRAME
+	}
 
 	private BluetoothSocket socket = null;
 	private BluetoothDevice device = null;
-	private TextView tvDataTemp,tvDataHumi = null;
+	private TextView tvDataTemp, tvDataHumi = null;
 	private BluetoothAdapter mBluetoothAdapter = BluetoothAdapter
 			.getDefaultAdapter();
-	
+
 	@Override
 	protected void onResume() {
 		super.onResume();
@@ -50,7 +51,7 @@ public class DataActivity extends Activity {
 
 	private readThread mreadThread = null;;
 	private ClientThread clientConnectThread = null;
-	
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -77,14 +78,16 @@ public class DataActivity extends Activity {
 			try {
 				socket = device.createRfcommSocketToServiceRecord(UUID
 						.fromString("00001101-0000-1000-8000-00805F9B34FB"));
-//				Toast.makeText(DataActivity.this, "请稍候，正在连接服务器" + BlueTooth.BlueToothAddress, Toast.LENGTH_SHORT).show();
-//				Message msg = new Message();
-//				msg.obj = "请稍候，正在连接服务器" + BlueTooth.BlueToothAddress;
-//				LinkDetectedHandler.sendMessage(msg);
+				// Toast.makeText(DataActivity.this, "请稍候，正在连接服务器" +
+				// BlueTooth.BlueToothAddress, Toast.LENGTH_SHORT).show();
+				// Message msg = new Message();
+				// msg.obj = "请稍候，正在连接服务器" + BlueTooth.BlueToothAddress;
+				// LinkDetectedHandler.sendMessage(msg);
 				socket.connect();
-//				Toast.makeText(DataActivity.this, "已经连接上服务器：" + BlueTooth.BlueToothAddress, Toast.LENGTH_SHORT).show();
-//				msg.obj = "已经连接上服务器：" + BlueTooth.BlueToothAddress;
-//				LinkDetectedHandler.sendMessage(msg);
+				// Toast.makeText(DataActivity.this, "已经连接上服务器：" +
+				// BlueTooth.BlueToothAddress, Toast.LENGTH_SHORT).show();
+				// msg.obj = "已经连接上服务器：" + BlueTooth.BlueToothAddress;
+				// LinkDetectedHandler.sendMessage(msg);
 				mreadThread = new readThread();
 				mreadThread.start();
 			} catch (IOException e) {
@@ -95,60 +98,92 @@ public class DataActivity extends Activity {
 		}
 
 	};
-	
+
 	// 读取数据
-		private class readThread extends Thread{
-			@Override
-			public void run() {
-				byte[] buffer = new byte[5];
-				byte[] buf_data = new byte[10];
-				int bytes=0;
-				InputStream mmInStream = null;
-				try {
-					mmInStream = socket.getInputStream();
-					int count = 0,i=0;
-					while (true) {
-							byte data = (byte) mmInStream.read();
-							boolean ishead = false;
-							if(data == (byte)0xAA && count ==0){
-								count = 1;
-							}if(data == (byte)0xBB && count ==1){
-								count = 2;
-								ishead = true;
-							}
-							if(count == 2&&(!ishead)){
-								buffer[i] = data;
-								i++;
-							}if(i==4){
-								i=0;
-								count=0;
-								Message msg = new Message();
-								msg.obj = "";
-								msg.obj = buffer;
-								LinkDetectedHandler.sendMessage(msg);
-							}
-					}
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-		};
-	
-	private Handler LinkDetectedHandler = new Handler(){
+	private class readThread extends Thread {
 		@Override
-		public void handleMessage(Message msg) {
-			byte[] buffer = (byte[])msg.obj;
-			int temp_i = (int)(buffer[1]&0xFF)*256+(int)(buffer[0]&0xFF);
-			int humi_i = (int)(buffer[3]&0xFF)*256+(int)(buffer[2]&0xFF);
-			float temp_f = (float) (((float)temp_i)*0.01-40);
-			float humi_f = (float)(((float)humi_i)*0.0405-((float)humi_i*(float)humi_i)*2.8/1000000-4);
-			Log.e("temp_i", ""+temp_i);
-			Log.e("humi_i", ""+humi_i);
-			Log.e("temp_f", ""+temp_f);
-			Log.e("humi_f", ""+humi_f);
-			tvDataTemp.setText("温度为："+temp_f+"℃");
-			tvDataHumi.setText("湿度为："+humi_f+"%");
+		public void run() {
+			// 新建一个handleDataFromBlueTooth的类去实现DataHandler接口
+			HandleDataFromBlueTooth handleDataFromBlueTooth = new HandleDataFromBlueTooth();
+			InputStream mmInStream = null;
+			try {
+				mmInStream = socket.getInputStream();
+				while (true) {
+					byte data = (byte) mmInStream.read();
+					handleDataFromBlueTooth.HandleData(data);
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
 	};
-	
+
+	public class HandleDataFromBlueTooth implements DataHandler {
+		// 创建私有的静态枚举型变量
+		private Status status = Status.OUTFRAME;
+		private int dataLength = 0,dataCount=0;
+		private byte[] dataFrame = null;
+		
+		@Override
+		public void HandleData(byte data) {
+			switch (status) {
+			case OUTFRAME:
+				dataFrame = null;
+				dataCount=0;
+				dataLength=0;
+				if (data == (byte)0xAA)
+					status = Status.HEADFRAME1;
+				break;
+			case HEADFRAME1:
+				if(data == (byte)0xBB)
+					status = Status.HEADFRAME2;
+				else
+					status = Status.OUTFRAME;
+				break;
+			case HEADFRAME2:
+				dataLength = data;
+				status = Status.DATAFRAME;
+				dataFrame = new byte[dataLength];
+				break;
+			case DATAFRAME:
+				dataFrame[dataCount] = data;
+				dataCount++;
+				if(dataCount == dataLength){
+					status = Status.OUTFRAME;
+					Message msg = new Message();
+					msg.obj = dataFrame;
+					LinkDetectedHandler.sendMessage(msg);
+				}
+			default:
+				break;
+			}
+		}
+
+	}
+
+	private Handler LinkDetectedHandler = new Handler() {
+		@Override
+		public void handleMessage(Message msg) {
+			byte[] buffer = (byte[]) msg.obj;
+			if (buffer[0] == 0x01) {
+				int temp_i = (int) (buffer[2] & 0xFF) * 256
+						+ (int) (buffer[1] & 0xFF);
+				float temp_f = (float) ((float) temp_i * 0.0625);
+				tvDataTemp.setText("温度为：" + temp_f + "℃");
+				tvDataHumi.setText("无湿度数据");
+			}
+			// int temp_i = (int)(buffer[1]&0xFF)*256+(int)(buffer[0]&0xFF);
+			// int humi_i = (int)(buffer[3]&0xFF)*256+(int)(buffer[2]&0xFF);
+			// float temp_f = (float) (((float)temp_i)*0.01-40);
+			// float humi_f =
+			// (float)(((float)humi_i)*0.0405-((float)humi_i*(float)humi_i)*2.8/1000000-4);
+			// Log.e("temp_i", ""+temp_i);
+			// Log.e("humi_i", ""+humi_i);
+			// Log.e("temp_f", ""+temp_f);
+			// Log.e("humi_f", ""+humi_f);
+			// tvDataTemp.setText("温度为："+temp_f+"℃");
+			// tvDataHumi.setText("湿度为："+humi_f+"%");
+		}
+	};
+
 }
