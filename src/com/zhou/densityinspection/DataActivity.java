@@ -19,7 +19,7 @@ import android.widget.Toast;
 
 public class DataActivity extends Activity {
 	public enum Status {
-		OUTFRAME, HEADFRAME1, HEADFRAME2, LENGTHFRAME, DATAFRAME
+		OUTFRAME, HEADFRAME1, HEADFRAME2, LENGTHFRAME,DATAFRAME,CHECKFRAME
 	}
 
 	private BluetoothSocket socket = null;
@@ -123,6 +123,7 @@ public class DataActivity extends Activity {
 		private Status status = Status.OUTFRAME;
 		private int dataLength = 0,dataCount=0;
 		private byte[] dataFrame = null;
+		private byte checkData = 0x00;
 		
 		@Override
 		public void HandleData(byte data) {
@@ -131,6 +132,7 @@ public class DataActivity extends Activity {
 				dataFrame = null;
 				dataCount=0;
 				dataLength=0;
+				checkData = 0x00;
 				if (data == (byte)0xAA)
 					status = Status.HEADFRAME1;
 				break;
@@ -142,18 +144,27 @@ public class DataActivity extends Activity {
 				break;
 			case HEADFRAME2:
 				dataLength = data;
-				status = Status.DATAFRAME;
 				dataFrame = new byte[dataLength];
+				status = Status.DATAFRAME;
+				checkData ^= data;
 				break;
 			case DATAFRAME:
 				dataFrame[dataCount] = data;
 				dataCount++;
+				checkData ^= data;
 				if(dataCount == dataLength){
-					status = Status.OUTFRAME;
-					Message msg = new Message();
-					msg.obj = dataFrame;
-					LinkDetectedHandler.sendMessage(msg);
+					status = Status.CHECKFRAME;
 				}
+				break;
+				case CHECKFRAME:
+//					Log.e(""+checkData, ""+data);
+					status = Status.OUTFRAME;
+					if(checkData == data){
+						Message msg = new Message();
+						msg.obj = dataFrame;
+						LinkDetectedHandler.sendMessage(msg);
+					}
+					break;
 			default:
 				break;
 			}
@@ -165,24 +176,30 @@ public class DataActivity extends Activity {
 		@Override
 		public void handleMessage(Message msg) {
 			byte[] buffer = (byte[]) msg.obj;
-			if (buffer[0] == 0x01) {
-				int temp_i = (int) (buffer[2] & 0xFF) * 256
-						+ (int) (buffer[1] & 0xFF);
-				float temp_f = (float) ((float) temp_i * 0.0625);
-				tvDataTemp.setText("温度为：" + temp_f + "℃");
-				tvDataHumi.setText("无湿度数据");
+//			Log.e("bufferLength", ""+buffer.length);
+			if(buffer[0] == 0x07){
+				 int temp_i = (int)(buffer[2]&0xFF)*256+(int)(buffer[1]&0xFF);
+				 int humi_i = (int)(buffer[4]&0xFF)*256+(int)(buffer[3]&0xFF);
+				 int lengthTimer = (int)(buffer[6]&0xFF)*256+(int)(buffer[5]&0xFF);
+				 float temp_f = (float) (((float)temp_i)*0.01-40);
+				 float humi_f =
+				 (float)(((float)humi_i)*0.0405-((float)humi_i*(float)humi_i)*2.8/1000000-4);
+				 Log.e("temp_i", ""+temp_i);
+				 Log.e("humi_i", ""+humi_i);
+				 Log.e("temp_f", ""+temp_f);
+				 Log.e("humi_f", ""+humi_f);
+				 Log.e("lengthTimer", ""+lengthTimer);
+				 tvDataTemp.setText("温度为："+temp_f+"℃");
+				 tvDataHumi.setText("湿度为："+humi_f+"%");
 			}
-			// int temp_i = (int)(buffer[1]&0xFF)*256+(int)(buffer[0]&0xFF);
-			// int humi_i = (int)(buffer[3]&0xFF)*256+(int)(buffer[2]&0xFF);
-			// float temp_f = (float) (((float)temp_i)*0.01-40);
-			// float humi_f =
-			// (float)(((float)humi_i)*0.0405-((float)humi_i*(float)humi_i)*2.8/1000000-4);
-			// Log.e("temp_i", ""+temp_i);
-			// Log.e("humi_i", ""+humi_i);
-			// Log.e("temp_f", ""+temp_f);
-			// Log.e("humi_f", ""+humi_f);
-			// tvDataTemp.setText("温度为："+temp_f+"℃");
-			// tvDataHumi.setText("湿度为："+humi_f+"%");
+//			if (buffer[0] == 0x01) {
+//				int temp_i = (int) (buffer[2] & 0xFF) * 256
+//						+ (int) (buffer[1] & 0xFF);
+//				float temp_f = (float) ((float) temp_i * 0.0625);
+//				tvDataTemp.setText("温度为：" + temp_f + "℃");
+//				tvDataHumi.setText("无湿度数据");
+//			}
+
 		}
 	};
 
