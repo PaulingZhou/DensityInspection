@@ -42,7 +42,7 @@ public class ChatListAdapter extends BaseAdapter {
 		if (convertView == null) {
 			convertView = mInflater.inflate(R.layout.list_item, null);
 			viewHolder = new ViewHolder(
-					(View) convertView.findViewById(R.id.list_child),
+					convertView.findViewById(R.id.list_child),
 					(TextView) convertView.findViewById(R.id.chat_msg));
 			convertView.setTag(viewHolder);
 		} else {
